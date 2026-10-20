@@ -1,128 +1,141 @@
-NAME
-     FCGI_Accept, FCGI_ToFILE, FCGI_ToFcgiStream
-         - fcgi_stdio compatibility library
+.TH FCGI_Accept 3 1997-09-16 "Open Market, Inc." "FastCGI Developer's Kit Library Manual"
+.SH NAME
+FCGI_Accept, FCGI_ToFILE, FCGI_ToFcgiStream - fcgi_stdio compatibility library
 
-SYNOPSIS
-     #include "fcgi_stdio.h"
+.SH SYNOPSIS
+.B #include "fcgi_stdio.h"
 
-     int
-     FCGI_Accept(void);
+.I int
+.br
+\%\fBFCGI_Accept\fR\fI(void)\fR;
 
-     FILE *
-     FCGI_ToFILE(FCGI_FILE *);
+.I FILE\ *
+.br
+\%\fBFCGI_ToFILE\fR\fI(FCGI_FILE *)\fR;
 
-     FCGI_Stream *
-     FCGI_ToFcgiStream(FCGI_FILE *);
+.I FCGI_Stream\ *
+.br
+\%\fBFCGI_ToFcgiStream\fR\fI(FCGI_FILE *)\fR;
 
+.SH DESCRIPTION
+.PP
+The \%\fBFCGI_Accept\fR() function accepts a new request from the HTTP server
+and creates a CGI-compatible execution environment for the request.
 
-DESCRIPTION
-     The FCGI_Accept function accepts a new request from the HTTP server
-     and creates a CGI-compatible execution environment for the request.
+If the application was invoked as a CGI program, the first call to
+\%\fBFCGI_Accept\fR() is essentially a no-op and the second call returns \-1.
+This causes a correctly coded FastCGI Responder application
+to run a single request and exit, giving CGI behavior.
 
-     If the application was invoked as a CGI program, the first
-     call to FCGI_Accept is essentially a no-op and the second
-     call returns -1.  This causes a correctly coded FastCGI Responder
-     application to run a single request and exit, giving CGI
-     behavior.
+If the application was invoked as a FastCGI server, the first call to
+\%\fBFCGI_Accept\fR() indicates that the application has completed its
+initialization and is ready to accept its first request.
+.
+Subsequent calls to \%\fBFCGI_Accept\fR() indicate that the application has
+completed processing its current request and is ready to accept a new request.
+.
+An application can complete the current request without accepting
+a new one by calling \%\fBFCGI_Finish\fR(3); later, when ready to accept a new
+request, the application calls \%\fBFCGI_Accept\fR().
 
-     If the application was invoked as a FastCGI server, the first
-     call to FCGI_Accept indicates that the application has completed
-     its initialization and is ready to accept its first request.
-     Subsequent calls to FCGI_Accept indicate that the application has
-     completed processing its current request and is ready to accept a
-     new request.  An application can complete the current request
-     without accepting a new one by calling FCGI_Finish(3); later, when
-     ready to accept a new request, the application calls FCGI_Accept.
+In completing the current request, \%\fBFCGI_Accept\fR() may detect errors,
+e.g. a broken pipe to a client who has disconnected early.
+\%\fBFCGI_Accept\fR() ignores such errors.
+.
+An application that wishes to handle such errors should explicitly call
+\%\fBfclose\fR(stderr), then \%\fBfclose\fR(stdout); an \%\fBEOF\fR return from
+either one indicates an error.
 
-     In completing the current request, FCGI_Accept may detect
-     errors, e.g. a broken pipe to a client who has disconnected
-     early.  FCGI_Accept ignores such errors.  An application
-     that wishes to handle such errors should explicitly call
-     fclose(stderr), then fclose(stdout); an EOF return from
-     either one indicates an error.
+If the environment variable \%\fBFCGI_WEB_SERVER_ADDRS\fR is set when
+\%\fBFCGI_Accept\fR() is called, it should contain a comma-separated
+list of IP addresses.  Each IP address is written as four decimal
+numbers in the range [0..255] separated by decimal points.
+(\%\fBnslookup\fR(8) translates the more familiar symbolic IP hostname
+into this form.)  So one legal binding for this variable is
 
-     If the environment variable FCGI_WEB_SERVER_ADDRS is set when
-     FCGI_Accept is called, it should contain a comma-separated list
-     of IP addresses.  Each IP address is written as four decimal
-     numbers in the range [0..255] separated by decimal points.
-     (nslookup(8) translates the more familiar symbolic IP hostname
-     into this form.)  So one legal binding for this variable is
+.EX
+FCGI_WEB_SERVER_ADDRS=199.170.183.28,199.170.183.71
+.EE
 
-         FCGI_WEB_SERVER_ADDRS=199.170.183.28,199.170.183.71
+\%\fBFCGI_Accept\fR() checks the peer IP address of each new connection
+for membership in the list.
+If the check fails (including the possibility that the connection didn't
+use TCP/IP transport), \%\fBFCGI_Accept\fR() closes the connection
+and accepts another one (without returning in between).
 
-     FCGI_Accept checks the peer IP address of each new connection for
-     membership in the list.  If the check fails (including the
-     possibility that the connection didn't use TCP/IP transport),
-     FCGI_Accept closes the connection and accepts another one
-     (without returning in between).
+After accepting a new request, \%\fBFCGI_Accept\fR() assigns new values
+to the global variables \%\fBstdin\fR, \%\fBstdout\fR, \%\fBstderr\fR,
+and \%\fBenviron\fR. After \%\fBFCGI_Accept\fR() returns, these variables
+have the same interpretation as on entry to a CGI program.
 
-     After accepting a new request, FCGI_Accept assigns new values
-     to the global variables stdin, stdout, stderr, and environ.
-     After FCGI_Accept returns, these variables have the same
-     interpretation as on entry to a CGI program.
+\%\fBFCGI_Accept\fR() frees any storage allocated by the previous call to it.
+This has important consequences:
 
-     FCGI_Accept frees any storage allocated by the previous call
-     to FCGI_Accept.  This has important consequences:
+.IP
+DO NOT retain pointers to the environ array or any strings
+contained in it (e.g. to the result of calling \%\fBgetenv\fR(3)),
+since these will be freed by the next call to \%\fBFCGI_Finish\fR() or
+\%\fBFCGI_Accept\fR().
 
-         DO NOT retain pointers to the environ array or any strings
-         contained in it (e.g. to the result of calling getenv(3)),
-         since these will be freed by the next call to FCGI_Finish or
-         FCGI_Accept.
+.IP
+DO NOT use \%\fBsetenv\fR(3) or \%\fBputenv\fR(3) to modify the environ
+array created by \%\fBFCGI_Accept\fR(), since this will either leak
+storage or cause the next call to \%\fBFCGI_Finish\fR() or
+\%\fBFCGI_Accept\fR() to free storage that should not be freed.
 
-         DO NOT use setenv(3) or putenv(3) to modify the environ array
-         created by FCGI_Accept, since this will either leak storage
-         or cause the next call to FCGI_Finish or FCGI_Accept to free
-         storage that should not be freed.
+.IP
+If your application needs to use \%\fBsetenv\fR(3) or \%\fBputenv\fR(3)
+to modify the environ array, it should follow this coding pattern:
 
-         If your application needs to use setenv or putenv to modify
-         the environ array, it should follow this coding pattern:
+.EX
+	char **savedEnviron, **requestEnviron;
+	int acceptStatus;
 
-             char **savedEnviron, **requestEnviron;
-             int acceptStatus;
+	savedEnviron = environ;
+	acceptStatus = FCGI_Accept();
+	requestEnviron = environ;
+	environ = savedEnviron;
+	if(acceptStatus >= 0 && !FCGX_IsCGI()) {
+		/*
+		* requestEnviron points to name-value pairs in
+		* storage allocated by FCGI_Accept.  OK to read,
+		* not OK to retain pointers -- make copies instead.
+		*/
+	}
+	/*
+	* OK to do setenv or putenv, but beware of storage leaks!
+	*/
+.EE
 
-             savedEnviron = environ;
-             acceptStatus = FCGI_Accept();
-             requestEnviron = environ;
-             environ = savedEnviron;
-             if(acceptStatus >= 0 && !FCGX_IsCGI()) {
-                 /*
-                  * requestEnviron points to name-value pairs in
-                  * storage allocated by FCGI_Accept.  OK to read,
-                  * not OK to retain pointers -- make copies instead.
-                  */
-             }
-             /*
-              * OK to do setenv or putenv, but beware of storage leaks!
-              */
+.PP
+In addition to the standard CGI environment variables, the environment
+variable \%\fBFCGI_ROLE\fR is always set to the role of the current
+request. The roles currently defined are \%\fBRESPONDER\fR,
+\%\fBAUTHORIZER\fR, and \%\fBFILTER\fR.
 
-     In addition to the standard CGI environment variables, the
-     environment variable FCGI_ROLE is always set to the role
-     of the current request.  The roles currently defined are
-     RESPONDER, AUTHORIZER, and FILTER.
+In the \%\fBFILTER\fR role, the additional variables
+\%\fBFCGI_DATA_LENGTH\fR and \%\fBFCGI_DATA_LAST_MOD\fR are also defined.
+See the manpage \%\fBFCGI_StartFilterData\fR(3) for complete information.
 
-     In the FILTER role, the additional variables FCGI_DATA_LENGTH
-     and FCGI_DATA_LAST_MOD are also defined.  See the manpage
-     FCGI_StartFilterData(3) for complete information.
+The macros \%\fBFCGI_ToFILE\fR and \%\fBFCGI_ToFcgiStream\fR are provided
+to allow escape to native functions that use the types \%\fBFILE\fR or
+\%\fBFCGI_Stream\fR.  In the case of \%\fBFILE\fR, functions would have to
+be separately compiled, since \%\fBfcgi_stdio.h\fR replaces the standard
+\%\fBFILE\fR with \%\fBFCGI_FILE\fR.
 
-     The macros FCGI_ToFILE and FCGI_ToFcgiStream are provided
-     to allow escape to native functions that use the types FILE or
-     FCGI_Stream.  In the case of FILE, functions would have to
-     be separately compiled, since fcgi_stdio.h replaces the standard
-     FILE with FCGI_FILE.
+.SH RETURN VALUES
+0 for successful call, \-1 for error (application should exit).
 
-     
-RETURN VALUES
-     0 for successful call, -1 for error (application should exit).
+.SH SEE ALSO
+.BR FCGI_Finish (3),
+.BR FCGI_StartFilterData (3),
+.BR FCGI_SetExitStatus (3),
+.BR cgi-fcgi (1),
+.BR nslookup (8)
 
-SEE ALSO
-     FCGI_Finish(3)
-     FCGI_StartFilterData(3)
-     FCGI_SetExitStatus(3)
-     cgi-fcgi(1)
-     nslookup(8)
+.SH LICENSE
+Copyright (c) 1996 Open Market, Inc.
+See the file "LICENSE" for information on usage and redistribution
+of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 
-HISTORY
-     Copyright (c) 1996 Open Market, Inc.
-     See the file "LICENSE" for information on usage and redistribution
-     of this file, and for a DISCLAIMER OF ALL WARRANTIES.
-     $Id: FCGI_Accept.3,v 1.1.1.1 1997/09/16 15:36:25 stanleyg Exp $
+$Id: FCGI_Accept.3,v 1.1.1.1 1997/09/16 15:36:25 stanleyg Exp $
